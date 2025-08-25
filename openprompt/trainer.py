@@ -21,7 +21,8 @@ from openprompt import PromptDataLoader
 from openprompt.prompts import *
 from openprompt.utils.logging import logger
 from openprompt.utils.metrics import classification_metrics, generation_metric
-from transformers import AdamW, get_linear_schedule_with_warmup
+from torch.optim import AdamW
+from transformers.optimization import get_linear_schedule_with_warmup
 import collections
 
 class BaseRunner(object):

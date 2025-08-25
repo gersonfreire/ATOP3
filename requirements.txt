@@ -38,3 +38,15 @@ transformers==4.55.4
 triton==3.4.0
 typing_extensions==4.15.0
 urllib3==2.5.0
+
+torch>=2.2.0
+transformers>=4.45.0
+tokenizers>=0.15.0
+yacs>=0.1.8
+numpy>=1.23.0
+pandas>=2.0.0
+scikit-learn>=1.1.0
+tqdm>=4.65.0
+matplotlib>=3.8.0
+dill>=0.3.6
+PyYAML>=6.0

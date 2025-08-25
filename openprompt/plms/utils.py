@@ -5,11 +5,11 @@ import torch
 import torch.nn as nn
 from torch.utils.data import Dataset
 from typing import Union, List, Tuple, Dict, Optional
-from transformers.data.processors.utils import InputExample, InputFeatures
 from transformers.tokenization_utils import PreTrainedTokenizer
 from collections import defaultdict
 from openprompt.utils import round_list
 import numpy as np
+from openprompt.data_utils import InputFeatures
 
 # 传入tokenizer，对数据进行截断处理
 

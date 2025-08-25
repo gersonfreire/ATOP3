@@ -52,6 +52,7 @@ def build_dataloader(dataset, template, tokenizer, config, split):
 def save_config_to_yaml(config):
     from contextlib import redirect_stdout
     saved_yaml_path = os.path.join(config.logging.path, "config.yaml")
+    os.makedirs(os.path.dirname(saved_yaml_path), exist_ok=True)
     with open(saved_yaml_path, 'w') as f:
         with redirect_stdout(f): print(config.dump())
     logger.info("Config saved as {}".format(saved_yaml_path))

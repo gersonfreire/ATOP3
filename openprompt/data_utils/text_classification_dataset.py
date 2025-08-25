@@ -102,41 +102,57 @@ class AESProcessor(DataProcessor):
         datas, labels, essay_ids, new_datas = [], [], [], []
         idx = -1
         # 直接读取手工特征然后添加到对应的文章中
-        readability_features = self.get_readability_features('../datasets/AES/allreadability.pickle')
-        linguistic_features = self.get_linguistic_features('../datasets/AES/hand_crafted_v3.csv')
+        base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
+        ds_dir = os.path.join(base_dir, 'datasets', 'AES')
+        readability_path = os.path.join(ds_dir, 'allreadability.pickle')
+        linguistic_path = os.path.join(ds_dir, 'hand_crafted_v3.csv')
+
+        readability_features = None
+        if os.path.exists(readability_path):
+            readability_features = self.get_readability_features(readability_path)
+
+        linguistic_features = self.get_linguistic_features(linguistic_path)
         normalized_linguistic_features = self.get_normalized_features(linguistic_features)
-        # with open(os.path.join(data_dir, '{}'.format(split)), mode='r', encoding='utf-8-sig') as input_file:
-        with open(os.path.join(data_dir, '{}'.format(split+'.pk')), mode='rb') as input_file:
+
+        data_file = os.path.join(data_dir, f"{split}.pk")
+        with open(data_file, mode='rb') as input_file:
             train_essays_list = pickle.load(input_file)
             for essay in train_essays_list:
                 idx = idx + 1
-                essay_set = int(essay['prompt_id']) # 主题==domain
-                essay_id = int(essay['essay_id']) # 文章编号
-                content = essay['content_text'].strip() # 文章内容
-                score = int(essay['score']) # 最终得分
-                scores_and_positions = get_score_vector_positions()  # 字典:{'score': 0, 'content': 1, 'organization': 2, 'word_choice': 3, 'sentence_fluency': 4, 'conventions': 5, 'prompt_adherence': 6, 'language': 7, 'narrativity': 8}
+                essay_set = int(essay['prompt_id'])  # 主题==domain
+                essay_id = int(essay['essay_id'])  # 文章编号
+                content = essay['content_text'].strip()  # 文章内容
+                score = int(essay['score'])  # 最终得分
+                scores_and_positions = get_score_vector_positions()
                 y_vector = [-1] * len(scores_and_positions)
                 for score2 in scores_and_positions.keys():
                     if score2 in essay.keys():
                         y_vector[scores_and_positions[score2]] = int(essay[score2])
 
-                # out_data['data_y'].append(y_vector)
-
                 if essay_set == domain:
                     # 可读性特征
-                    item_index = np.where(readability_features[:, :1] == essay_id)
-                    item_row_index = item_index[0][0]
-                    item_features = readability_features[item_row_index][1:]
-                    # out_data['readability_x'].append(item_features)
+                    if readability_features is not None:
+                        item_index = np.where(readability_features[:, :1] == essay_id)
+                        item_row_index = item_index[0][0]
+                        item_features = readability_features[item_row_index][1:]
+                    else:
+                        item_features = np.array([])
+
                     # 手工特征
                     feats_df = normalized_linguistic_features[normalized_linguistic_features.loc[:, 'item_id'] == essay_id]
                     feats_craft = np.array(feats_df.values.tolist()[0][1:])
-                    # out_data['features_x'].append(feats_list)
-                    # 手工特征end
+
                     category = get_model_friendly_scores(score, domain)
-                    # guid(每句话的id,可选) text_a（输入的文本数据）、text_b （分析两句的关系会用，不必有）、label （分类中标签的ID）、
-                    example = InputExample(guid=essay_id, text_a=content, label=category, index = idx,
-                                           essay_set = essay_set,feats_craft=feats_craft,item_features=item_features,attributes=y_vector) # 封装
+                    example = InputExample(
+                        guid=essay_id,
+                        text_a=content,
+                        label=category,
+                        index=idx,
+                        essay_set=essay_set,
+                        feats_craft=feats_craft,
+                        item_features=item_features,
+                        attributes=y_vector,
+                    )
                     examples.append(example)
 
         return examples

@@ -59,7 +59,7 @@ logging:
   - datetime
 plm:
   model_name: bert
-  model_path: ../bert
+  model_path: bert-base-uncased
   optimize:
     betas:
     - 0.9
