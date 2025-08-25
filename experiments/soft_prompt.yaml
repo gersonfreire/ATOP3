@@ -1,6 +1,6 @@
 dataset:
   name: AES
-  path: ../datasets/AES
+  path: ./datasets/AES
   domains:
     - 1
     - 2
@@ -17,7 +17,7 @@ dataset:
 
 plm:
   model_name: bert
-  model_path: ../bert
+  model_path: bert-base-uncased
 #  model_name: roberta
 #  model_path: ../roberta-base
   optimize:
@@ -69,12 +69,9 @@ soft_verbalizer:
 
 
 environment:
-  num_gpus: 4
+  num_gpus: 0
   cuda_visible_devices:
     - 0
-    - 1
-    - 2
-    - 3
   local_rank: 0
 
 learning_setting: full

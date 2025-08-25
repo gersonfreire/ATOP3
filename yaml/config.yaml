@@ -29,7 +29,7 @@ dataset:
   - 8
   kl_div: false
   name: AES
-  path: ../datasets/AES
+  path: ./datasets/AES
   target_domain: 5
 dev:
   batch_size: 32
