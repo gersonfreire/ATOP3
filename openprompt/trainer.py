@@ -150,8 +150,10 @@ class BaseRunner(object):
                         domain=self.config.dataset.target_domain,            # cpu to prevent CUDA out of memory.
                         )
         self.inner_model.load_state_dict(state_dict['state_dict'])
-        # self.inner_model.to("cuda:{}".format(self.config.environment.local_rank))
-        self.inner_model.to('cuda')
+        device = 'cuda' if (torch.cuda.is_available() and self.config.environment.num_gpus > 0) else 'cpu'
+        if device == 'cuda':
+            device = f"cuda:{self.config.environment.local_rank}"
+        self.inner_model.to(device)
         print("best performance:{}".format(max_score))
         print("best att performance:{}".format(max_att))
         # print("best test performance:{}".format(max_testscore))
@@ -162,10 +164,10 @@ class BaseRunner(object):
         logger.info("Resume Training ...")
         try:
             state_dict = load_checkpoint(load_path=self.config.logging.path,
-                    load_best = True,
-                    map_location="cpu",
-                    domain=self.config.dataset.target_domain,# cpu to prevent CUDA out of memory.
-                    )
+                load_best = True,
+                map_location="cpu",
+                domain=self.config.dataset.target_domain,
+                )
         except FileNotFoundError:
             logger.warning("No checkpoint found in {}, start from scratch.".format(self.config.logging.path))
             self.run()
@@ -173,8 +175,10 @@ class BaseRunner(object):
         
         # load state to model
         self.inner_model.load_state_dict(state_dict['state_dict'])
-        # self.inner_model.to("cuda:{}".format(self.config.environment.local_rank))
-        self.inner_model.to('cuda')
+        device = 'cuda' if (torch.cuda.is_available() and self.config.environment.num_gpus > 0) else 'cpu'
+        if device == 'cuda':
+            device = f"cuda:{self.config.environment.local_rank}"
+        self.inner_model.to(device)
         # load state to optimizers
         for optimizer, op_state in zip(self.optimizers, state_dict['optimizer']):
             if isinstance(optimizer, torch.optim.Optimizer):
@@ -199,8 +203,10 @@ class BaseRunner(object):
 
         # load state to model
         self.inner_model.load_state_dict(state_dict['state_dict'])
-        # self.inner_model.to("cuda:{}".format(self.config.environment.local_rank))
-        self.inner_model.to('cuda')
+        device = 'cuda' if (torch.cuda.is_available() and self.config.environment.num_gpus > 0) else 'cpu'
+        if device == 'cuda':
+            device = f"cuda:{self.config.environment.local_rank}"
+        self.inner_model.to(device)
         self.evaluate(self.test_dataloader, "Test")
 
 
@@ -287,15 +293,20 @@ class ClassificationRunner(BaseRunner):
         template_config = self.config[self.config.template]
         if hasattr(template_config, "optimize") and template_config.optimize is not None:
             if not hasattr(self.inner_model.template, "optimize"):
-                # using default gradient descent optimizer.
-                self.template_optimizer = AdamW(self.inner_model.template.parameters(), lr = template_config.optimize.lr)
-                if hasattr(template_config.optimize, "scheduler") and template_config.optimize.scheduler is not None:
-                    self.template_scheduler = get_linear_schedule_with_warmup(
-                        self.template_optimizer, 
-                        num_warmup_steps = template_config.optimize.scheduler.num_warmup_steps, 
-                        num_training_steps = num_training_steps
-                    )
+                # using default gradient descent optimizer if there are trainable params.
+                tpl_params = [p for p in self.inner_model.template.parameters() if p.requires_grad]
+                if len(tpl_params) > 0:
+                    self.template_optimizer = AdamW(tpl_params, lr = template_config.optimize.lr)
+                    if hasattr(template_config.optimize, "scheduler") and template_config.optimize.scheduler is not None:
+                        self.template_scheduler = get_linear_schedule_with_warmup(
+                            self.template_optimizer, 
+                            num_warmup_steps = template_config.optimize.scheduler.num_warmup_steps, 
+                            num_training_steps = num_training_steps
+                        )
+                    else:
+                        self.template_scheduler = None
                 else:
+                    self.template_optimizer = None
                     self.template_scheduler = None
             else:
                 self.template_optimizer = Dummy()
@@ -312,15 +323,20 @@ class ClassificationRunner(BaseRunner):
         verbalizer_config = self.config[self.config.verbalizer]
         if hasattr(verbalizer_config, "optimize") and verbalizer_config.optimize is not None:
             if not hasattr(self.inner_model.verbalizer, "optimize"):
-                # using default gradient descent optimizer.
-                self.verbalizer_optimizer = AdamW(self.inner_model.verbalizer.parameters(), lr = verbalizer_config.optimize.lr)
-                if hasattr(verbalizer_config.optimize, "scheduler") and verbalizer_config.optimize.scheduler is not None:
-                    self.verbalizer_scheduler = get_linear_schedule_with_warmup(
-                        self.verbalizer_optimizer, 
-                        num_warmup_steps = verbalizer_config.optimize.scheduler.num_warmup_steps, 
-                        num_training_steps = num_training_steps
-                    )
+                # using default gradient descent optimizer if there are trainable params.
+                v_params = [p for p in self.inner_model.verbalizer.parameters() if p.requires_grad]
+                if len(v_params) > 0:
+                    self.verbalizer_optimizer = AdamW(v_params, lr = verbalizer_config.optimize.lr)
+                    if hasattr(verbalizer_config.optimize, "scheduler") and verbalizer_config.optimize.scheduler is not None:
+                        self.verbalizer_scheduler = get_linear_schedule_with_warmup(
+                            self.verbalizer_optimizer, 
+                            num_warmup_steps = verbalizer_config.optimize.scheduler.num_warmup_steps, 
+                            num_training_steps = num_training_steps
+                        )
+                    else:
+                        self.verbalizer_scheduler = None
                 else:
+                    self.verbalizer_optimizer = None
                     self.verbalizer_scheduler = None
             else:
                 self.verbalizer_optimizer = Dummy()
@@ -496,11 +512,13 @@ class ClassificationRunner(BaseRunner):
         qwk_att_all = {}
         self.prompt_model.eval()
         with torch.no_grad():
+            device = 'cuda' if (torch.cuda.is_available() and self.config.environment.num_gpus > 0) else 'cpu'
+            if device == 'cuda':
+                device = f"cuda:{self.config.environment.local_rank}"
             for batch in tqdm(dataloader, desc=split):
                 num = num+1
-                # batch = batch.to("cuda:{}".format(self.config.environment.local_rank)).to_dict()
-                batch = batch.to('cuda').to_dict()
-                label = batch['label'].long().to('cuda')
+                batch = batch.to(device).to_dict()
+                label = batch['label'].long().to(device)
                 label = label.cpu()
                 batch.pop('label')
                 batch['AT'] = False
@@ -558,8 +576,9 @@ class ClassificationRunner(BaseRunner):
         return entropy
 
     def masked_loss_function_torch(self, y_true, y_pred, mask_value=-1):
-        mask = (y_true != mask_value).float().cuda()
-        mse_loss = F.mse_loss(y_true.cuda() * mask, y_pred * mask)
+        device = y_pred.device
+        mask = (y_true.to(device) != mask_value).float()
+        mse_loss = F.mse_loss(y_true.to(device) * mask, y_pred * mask)
         return mse_loss
 
     def train_epoch(self, epoch):
@@ -577,15 +596,18 @@ class ClassificationRunner(BaseRunner):
         NC = False
         NA = True
         # ！！！！！！！！！！！ memory_bank初始化
+        device = 'cuda' if (torch.cuda.is_available() and self.config.environment.num_gpus > 0) else 'cpu'
+        if device == 'cuda':
+            device = f"cuda:{self.config.environment.local_rank}"
         if NA:
-            mem_fea = torch.rand(1445, 768).cuda() # 8域的train数据长度为579, 5是1445
+            mem_fea = torch.rand(1445, 768, device=device) # 8域的train数据长度为579, 5是1445
             mem_fea = mem_fea / torch.norm(mem_fea, p=2, dim=1, keepdim=True)
-            mem_cls = torch.ones(1445, 4).cuda() / 4 # (data_len,4)
-            mem_fea2 = torch.rand(1445, 768).cuda()  # 8域的train数据长度为579, 5是1445
+            mem_cls = torch.ones(1445, 4, device=device) / 4 # (data_len,4)
+            mem_fea2 = torch.rand(1445, 768, device=device)  # 8域的train数据长度为579, 5是1445
             mem_fea2 = mem_fea2 / torch.norm(mem_fea2, p=2, dim=1, keepdim=True)
-            mem_cls2 = torch.ones(1445, 4).cuda() / 4  # (data_len,4)
+            mem_cls2 = torch.ones(1445, 4, device=device) / 4  # (data_len,4)
         if NC:
-            mem_fea = torch.rand(4, 768).cuda()
+            mem_fea = torch.rand(4, 768, device=device)
             mem_fea = mem_fea / torch.norm(mem_fea, p=2, dim=1, keepdim=True)
         # ！！！！！！！！！！！！
 
@@ -603,7 +625,7 @@ class ClassificationRunner(BaseRunner):
                     optimizer.zero_grad()
 
             for _, batch in enumerate(batches):
-                batch = batch.to('cuda').to_dict()
+                batch = batch.to(device).to_dict()
                 batch['AT'] = True
                 logits, hiddens, logits_all,attributes_pre = self.prompt_model(batch) # (4,4) (4,768)
                 hidden_list.append(hiddens)
@@ -648,7 +670,7 @@ class ClassificationRunner(BaseRunner):
                 # gamma = 2 / (1 + math.exp(-10 * (now_iter) / 20*328)) - 1 # 用这个除号会越界导致结果一直为1.0
                 gamma = torch.true_divide(2.0, (1.0 + torch.exp(torch.true_divide(-10 * (now_iter), 328 * 30)))) - 1.0
                 gamma2 = torch.true_divide(2.0, (1.0 + torch.exp(torch.true_divide(-10 * (now_iter+328*50), 328 * 30)))) - 1.0
-                gamma2 = gamma2.cuda()
+                gamma2 = gamma2.to(device)
                 loss_domain = torch.mean(self.domain_adv(hidden_list, gamma2.unsqueeze(-1))) # 输入的是8*（4，768），但由于并行4个卡，每个卡分到8*(1,768)
                 # if step % 40 == 0: print(gamma)
                 pbar.set_postfix({'loss_domain=': loss_domain})
@@ -669,7 +691,7 @@ class ClassificationRunner(BaseRunner):
                 for di in range(dis.size(0)):
                     dis[di, idx[di]] = torch.max(dis)
                 _, p1 = torch.sort(dis, dim=1)
-                w = torch.zeros(hidden_list[domains].size(0), mem_fea.size(0)).cuda()
+                w = torch.zeros(hidden_list[domains].size(0), mem_fea.size(0), device=device)
                 for wi in range(w.size(0)):
                     for wj in range(5):
                         w[wi][p1[wi, wj]] = 1 / 5
@@ -699,7 +721,7 @@ class ClassificationRunner(BaseRunner):
             if NA:
                 self.prompt_model.eval()
                 with torch.no_grad():
-                    target_batch=batches[domains].to('cuda').to_dict()
+                    target_batch=batches[domains].to(device).to_dict()
                     target_batch['AT'] = True
                     outputs_target, features_target,_,_ = self.prompt_model(target_batch)
                     features_target = features_target / torch.norm(features_target, p=2, dim=1, keepdim=True)
@@ -710,10 +732,10 @@ class ClassificationRunner(BaseRunner):
             if NC:
                 self.prompt_model.eval()
                 with torch.no_grad():
-                    outputs_target, features_target, _,_ = self.prompt_model(batches[domains].to('cuda').to_dict())
+                    outputs_target, features_target, _,_ = self.prompt_model(batches[domains].to(device).to_dict())
                     softmax_t = torch.nn.Softmax(dim=1)(outputs_target)
                     _, pred_t = torch.max(softmax_t, 1)
-                    onehot_t = torch.eye(4)[pred_t].cuda()
+                    onehot_t = torch.eye(4, device=device)[pred_t]
                     center_t = torch.mm(features_target.t(), onehot_t) / (onehot_t.sum(dim=0) + 1e-8)
                 mem_fea = (1.0 - 0.1) * mem_fea + 0.1 * center_t.t().clone()
             # ！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！
@@ -733,7 +755,7 @@ class ClassificationRunner(BaseRunner):
                     optimizer.zero_grad()
 
             for j, batch in enumerate(batches):
-                batch = batch.to('cuda').to_dict()
+                batch = batch.to(device).to_dict()
                 batch['AT'] = False
                 logits, hiddens, logits_all,attributes_pre = self.prompt_model(batch)  # (4,4) (4,768)
                 hidden_list.append(hiddens)
@@ -837,7 +859,7 @@ class ClassificationRunner(BaseRunner):
             if NA:
                 self.prompt_model.eval()
                 with torch.no_grad():
-                    target_batch = batches[domains].to('cuda').to_dict()
+                    target_batch = batches[domains].to(device).to_dict()
                     target_batch['AT'] = True
                     outputs_target, features_target, _, _ = self.prompt_model(target_batch)
                     features_target = features_target / torch.norm(features_target, p=2, dim=1, keepdim=True)
@@ -848,10 +870,10 @@ class ClassificationRunner(BaseRunner):
             if NC:
                 self.prompt_model.eval()
                 with torch.no_grad():
-                    outputs_target, features_target, _, _ = self.prompt_model(batches[domains].to('cuda').to_dict())
+                    outputs_target, features_target, _, _ = self.prompt_model(batches[domains].to(device).to_dict())
                     softmax_t = torch.nn.Softmax(dim=1)(outputs_target)
                     _, pred_t = torch.max(softmax_t, 1)
-                    onehot_t = torch.eye(4)[pred_t].cuda()
+                    onehot_t = torch.eye(4, device=device)[pred_t]
                     center_t = torch.mm(features_target.t(), onehot_t) / (onehot_t.sum(dim=0) + 1e-8)
                 mem_fea = (1.0 - 0.1) * mem_fea + 0.1 * center_t.t().clone()
             # ！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！
@@ -884,9 +906,11 @@ class ClassificationRunner(BaseRunner):
             raise NotImplementedError
 
         with torch.no_grad():
+            device = 'cuda' if (torch.cuda.is_available() and self.config.environment.num_gpus > 0) else 'cpu'
+            if device == 'cuda':
+                device = f"cuda:{self.config.environment.local_rank}"
             for batch in tqdm(dataloader, desc="Init_using_{}".format(using_split)):
-                # batch = batch.to("cuda:{}".format(self.config.environment.local_rank)).to_dict()
-                batch = batch.to('cuda').to_dict()
+                batch = batch.to(device).to_dict()
                 logits,_ = self.prompt_model(batch)
             if hasattr(self.inner_model.verbalizer, "optimize_to_initialize" ):
                 self.inner_model.verbalizer.optimize_to_initialize()
