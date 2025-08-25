@@ -1,6 +1,6 @@
 import math
 
-from transformers import AdamW
+from torch.optim import AdamW
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
