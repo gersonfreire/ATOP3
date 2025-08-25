@@ -818,7 +818,8 @@ class ClassificationRunner(BaseRunner):
                 for di in range(dis.size(0)):
                     dis[di, idx[di]] = torch.max(dis)
                 _, p1 = torch.sort(dis, dim=1)
-                w = torch.zeros(hidden_list[domains].size(0), mem_fea2.size(0)).cuda()
+                # allocate on the active device instead of hardcoding CUDA
+                w = torch.zeros(hidden_list[domains].size(0), mem_fea2.size(0), device=device)
                 for wi in range(w.size(0)):
                     for wj in range(5):
                         w[wi][p1[wi, wj]] = 1 / 5
