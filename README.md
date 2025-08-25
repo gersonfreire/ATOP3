@@ -1,0 +1,30 @@
+# ATOP
+Code for Paper "ATOP:Adversarial TOpic-aware Prompt-tuning for Cross-topic Automated Essay Scoring"
+
+### Requirements
+The project requires Python 3.7 or higher. All dependencies are listed in `requirements.txt`.
+
+### Setup
+To set up the environment, follow these steps:
+
+1. Create a Python virtual environment:
+   ```bash
+   python3 -m venv venv
+   ```
+2. Activate the virtual environment:
+   ```bash
+   source venv/bin/activate
+   ```
+3. Install the required dependencies:
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+### Run
+```
+python experiments/cli.py --config_yaml soft_prompt.yaml 
+```
+### Credits
+```
+The code is built based on the open-source toolkit [OpenPrompt](https://github.com/thunlp/OpenPrompt). 
+```
