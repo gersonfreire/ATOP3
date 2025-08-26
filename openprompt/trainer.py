@@ -99,8 +99,12 @@ class BaseRunner(object):
         # 添加图例，并指定放置位置为右上角
         # ax.legend(loc='upper right')
 
-        # 保存图像到文件
+        # 保存图像到文件（确保目录存在）
+        out_dir = os.path.dirname(filename)
+        if out_dir and not os.path.exists(out_dir):
+            os.makedirs(out_dir, exist_ok=True)
         plt.savefig(filename)
+        plt.close(fig)
 
     def run(self, start_epoch: int=0, max_score: float=0.0):
 
