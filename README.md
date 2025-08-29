@@ -29,6 +29,13 @@ To set up the environment, follow these steps:
 python experiments/cli.py --config_yaml soft_prompt.yaml 
 ```
 
+### Para gerar log
+
+```
+mkdir -p logs
+PYTHONUNBUFFERED=1 python -u experiments/cli.py --config_yaml soft_prompt.yaml 2>&1 | tee -a logs/train_$(date +%F_%H-%M-%S).log
+```
+
 ### Credits
 
 ```
