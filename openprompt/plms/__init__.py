@@ -22,7 +22,7 @@ logging.set_verbosity_error()
 
     
 ModelClass = namedtuple("ModelClass", ('config', 'tokenizer', 'model'))
-# 设置模型的下游任务
+# Define as classes de modelo para tarefas downstream
 _MODEL_CLASSES = {
     'bert': ModelClass(**{
         'config': BertConfig,
@@ -92,9 +92,9 @@ def load_plm(config: CfgNode):
     model_class = get_model_class(plm_type = plm_config.model_name)
     model_config = model_class.config.from_pretrained(plm_config.model_path)
     model_config.output_hidden_states = True
-    # you can change huggingface model_config here
+    # você pode alterar o model_config do huggingface aqui
     model = model_class.model.from_pretrained(plm_config.model_path, config=model_config,ignore_mismatched_sizes=True)
-    # 冻结参数
+    # Congela os parâmetros do modelo
     for name, param in model.named_parameters():
         param.requires_grad = False
     tokenizer = model_class.tokenizer.from_pretrained(plm_config.model_path)
@@ -105,17 +105,17 @@ def load_plm(config: CfgNode):
 def add_special_tokens(model: PreTrainedModel, 
                        tokenizer: PreTrainedTokenizer,
                        specials_to_add: Optional[List[str]] = None):
-    r"""add the special_tokens to tokenizer if the special token
-    is not in the tokenizer. 
+    r"""Adiciona os tokens especiais ao tokenizer se o token especial
+    não estiver presente no tokenizer.
 
     Args:
-        model (:obj:`PreTrainedModel`): The pretrained model to resize embedding
-                after adding special tokens.
-        tokenizer (:obj:`PreTrainedTokenizer`): The pretrained tokenizer to add special tokens.
-        specials_to_add: (:obj:`List[str]`, optional): The special tokens to be added. Defaults to pad token.
+        model (:obj:`PreTrainedModel`): O modelo pré-treinado para redimensionar o embedding
+                após adicionar tokens especiais.
+        tokenizer (:obj:`PreTrainedTokenizer`): O tokenizer pré-treinado para adicionar tokens especiais.
+        specials_to_add: (:obj:`List[str]`, opcional): Os tokens especiais a serem adicionados. Padrão é o token de preenchimento (pad).
 
     Returns:
-        The resized model, The tokenizer with the added special tokens.
+        O modelo redimensionado, o tokenizer com os tokens especiais adicionados.
 
     """
     if specials_to_add is None:
@@ -125,7 +125,7 @@ def add_special_tokens(model: PreTrainedModel,
             if tokenizer.pad_token is None:
                 tokenizer.add_special_tokens({'pad_token': token})
                 model.resize_token_embeddings(len(tokenizer))
-                logger.info("pad token is None, set to id {}".format(tokenizer.pad_token_id))
+                logger.info("pad token é None, definido para o id {}".format(tokenizer.pad_token_id))
     return model, tokenizer
 
 
