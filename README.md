@@ -26,7 +26,7 @@ To set up the environment, follow these steps:
 ### Run
 
 ```
-python experiments/cli.py --config_yaml soft_prompt.yaml 
+python experiments/cli.py --config_yaml experiments/soft_prompt.yaml
 ```
 
 ### Para gerar log
